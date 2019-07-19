@@ -74,3 +74,15 @@ def extract_volumes(filename):
     Volume = np.pi / 6 * Diameter ** 3
 
     return Volume
+
+def extract_histogram(filename):
+
+    M3_data = parse_M3_file(filename)
+
+    BinDiameterIter = (float(x) for x in M3_data['#Bindiam']['Values'])
+    BinHeightIter = (float(x) for x in M3_data['#Binheight']['Values'])
+
+    BinDiameter = np.fromiter(BinDiameterIter, dtype=float)
+    BinHeight = np.fromiter(BinHeightIter, dtype=float)
+
+    return BinDiameter, BinHeight
