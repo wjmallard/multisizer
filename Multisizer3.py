@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
-import matplotlib.pyplot as plt
 import re
-
-FILENAME = 'test.#M3'
 
 def parse_M3_file(filename):
     '''
@@ -51,7 +48,9 @@ def extract_pulses(M3_data):
     Pulses = M3_data['#Pulses5hex']['Values']
     return np.array([decode_pulse(p) for p in Pulses])
 
-def extract_diameters(M3_data):
+def extract_diameters(filename):
+
+    M3_data = parse_M3_file(filename)
 
     Instrument = M3_data['instrument']
 
@@ -67,23 +66,11 @@ def extract_diameters(M3_data):
 
     return Diameter
 
-def extract_volumes(M3_data):
+def extract_volumes(filename):
+
+    M3_data = parse_M3_file(filename)
 
     Diameter = extract_diameters(M3_data)
     Volume = np.pi / 6 * Diameter ** 3
 
     return Volume
-
-M3_data = parse_M3_file(FILENAME)
-Diameter = extract_diameters(M3_data)
-
-plt.close('all')
-plt.hist(np.log10(Diameter), bins=25, histtype='step')
-
-tick_labels = np.arange(1, np.ceil(Diameter.max() + 1), dtype=int)
-tick_locs = np.log10(tick_labels)
-plt.xticks(tick_locs, tick_labels)
-
-plt.xlabel('Particle Diameter (um)')
-plt.ylabel('Number')
-plt.title('Differential Number')
