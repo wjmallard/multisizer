@@ -36,10 +36,10 @@ def parse_M3_file(filename):
 
     return data
 
-def parse_pulse(pulse_array):
+def decode_pulse(pulse_array):
     return [int(n, 16) for n in pulse_array.split(',')]
 
-def extract_volumes(raw_data):
+def extract_pulses(M3_data):
     '''
     Pulse hex format:
     - MaxHeight
@@ -48,7 +48,12 @@ def extract_volumes(raw_data):
     - Area
     - Gain
     '''
-    Instrument = raw_data['instrument']
+    Pulses = M3_data['#Pulses5hex']['Values']
+    return np.array([decode_pulse(p) for p in Pulses])
+
+def extract_diameters(M3_data):
+
+    Instrument = M3_data['instrument']
 
     Kd = float(Instrument['Kd'])
     MaxHtCorr = int(Instrument['MaxHtCorr'])
@@ -56,21 +61,29 @@ def extract_volumes(raw_data):
     Current = int(Instrument['Current']) / 1000  # mA
     Resistance = 25 * int(Instrument['Gain'])  # kohm
 
-    Pulses = raw_data['#Pulses5hex']['Values']
-    MaxHeight_iter = (parse_pulse(p)[0] for p in Pulses)
-    MaxHeight = np.fromiter(MaxHeight_iter, dtype=int)
-
-    Height = MaxHeight + MaxHtCorr
+    Pulses = extract_pulses(M3_data)
+    Height = Pulses[:, 0] + MaxHtCorr
     Diameter = Kd * (Height / (CountsPerVolt * Current * Resistance)) ** (1/3)
-    Volume = np.pi / 6 * Diameter ** 3
 
     return Diameter
 
-raw_data = parse_M3_file(FILENAME)
-Volume = extract_volumes(raw_data)
+def extract_volumes(M3_data):
+
+    Diameter = extract_diameters(M3_data)
+    Volume = np.pi / 6 * Diameter ** 3
+
+    return Volume
+
+M3_data = parse_M3_file(FILENAME)
+Diameter = extract_diameters(M3_data)
 
 plt.close('all')
-plt.hist(Volume, bins=101, histtype='step')
+plt.hist(np.log10(Diameter), bins=25, histtype='step')
+
+tick_labels = np.arange(1, np.ceil(Diameter.max() + 1), dtype=int)
+tick_locs = np.log10(tick_labels)
+plt.xticks(tick_locs, tick_labels)
+
 plt.xlabel('Particle Diameter (um)')
 plt.ylabel('Number')
 plt.title('Differential Number')
