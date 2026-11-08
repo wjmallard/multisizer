@@ -10,6 +10,9 @@ PULSE_DTYPE = np.dtype([
     ('Width', np.int64),
     ('Area', np.int64),
     ('Gain', np.int64),
+    ('MaxGainStage', np.int64),
+    ('MidGainStage', np.int64),
+    ('Flagged', np.bool_),
 ])
 
 @dataclass
@@ -77,6 +80,11 @@ def extract_pulses(data):
      - Width
      - Area
      - Gain
+
+    Gain bit fields:
+     - MaxGainStage
+     - MidGainStage
+     - Flagged
     '''
     if not has_pulses(data):
         raise ValueError('No raw pulse data found.')
@@ -95,6 +103,12 @@ def extract_pulses(data):
     pulses['Width'] = rows[:, 2]
     pulses['Area'] = rows[:, 3]
     pulses['Gain'] = rows[:, 4]
+
+    # Unpack the Gain bit field.
+    gain = pulses['Gain']
+    pulses['MaxGainStage'] = gain & 0x0F
+    pulses['MidGainStage'] = (gain & 0x70) >> 4
+    pulses['Flagged'] = (gain & 0x80) != 0
 
     return pulses
 
