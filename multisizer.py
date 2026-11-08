@@ -125,9 +125,9 @@ def extract_diameters(data):
 
     Kd = float(Instrument['Kd'])
     MaxHtCorr = int(Instrument['MaxHtCorr'])
-    CountsPerVolt = 838861  # 1/V
+    CountsPerVolt = float(Instrument['CperV'])  # 1/V
     Current = int(Instrument['Current']) / 1000  # mA
-    Resistance = 25 * int(Instrument['Gain'])  # kohm
+    Resistance = float(Instrument['Resistance'])  # kohm
 
     Pulses = extract_pulses(data)
     Height = Pulses['MaxHeight'] + MaxHtCorr
