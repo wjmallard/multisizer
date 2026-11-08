@@ -32,6 +32,22 @@ class MultisizerRun:
         self.arrays: dict[str, list[str]] = {}
         self._parse()
 
+    def __repr__(self) -> str:
+
+        details = []
+
+        if '#Bindiam' in self.arrays:
+            num_bins = len(self.arrays['#Bindiam']) - 1
+            details.append(f'{num_bins} bins')
+
+        if self.has_pulses:
+            num_pulses = len(self.arrays['#Pulses5hex'])
+            details.append(f'{num_pulses} pulses')
+
+        summary = f': {", ".join(details)}' if details else ''
+
+        return f'<{type(self).__name__} {self.path.name}{summary}>'
+
     def _parse(self):
         '''
         Parse Multisizer data into 'fields' and 'arrays'.
