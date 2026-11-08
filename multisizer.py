@@ -21,15 +21,22 @@ def parse_M3_file(filename):
     data = MultisizerRun(Path(filename))
     section = None
 
-    with open(filename) as fh:
+    with data.path.open(encoding='cp1252') as fh:
         lines = [raw.strip() for raw in fh]
 
     for line in lines:
+
+        # Skip blank lines.
+        if not line:
+            continue
 
         # Start a new section.
         if line.startswith('[') and line.endswith(']'):
             section = line[1:-1].strip()
             continue
+
+        if section is None:
+            raise ValueError(f'Found data outside of a section: {line!r}')
 
         # Parse kv pairs.
         key, sep, value = line.partition('=')
