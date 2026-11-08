@@ -3,6 +3,15 @@ import numpy as np
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# Pulse table format:
+PULSE_DTYPE = np.dtype([
+    ('MaxHeight', np.int64),
+    ('MidHeight', np.int64),
+    ('Width', np.int64),
+    ('Area', np.int64),
+    ('Gain', np.int64),
+])
+
 @dataclass
 class MultisizerRun:
     '''
@@ -57,23 +66,37 @@ def has_pulses(data):
     '''
     return '#Pulses5hex' in data.arrays
 
-def decode_pulse(pulse_array):
-    return [int(n, 16) for n in pulse_array.split(',')]
-
 def extract_pulses(data):
     '''
-    Pulse hex format:
-    - MaxHeight
-    - MidHeight
-    - Width
-    - Area
-    - Gain
+    Extract raw pulse data as a structured array (PULSE_DTYPE),
+    with columns accessed by name, e.g. pulses['MaxHeight'].
+
+    Pulse5hex fields:
+     - MaxHeight
+     - MidHeight
+     - Width
+     - Area
+     - Gain
     '''
     if not has_pulses(data):
         raise ValueError('No raw pulse data found.')
 
-    Pulses = data.arrays['#Pulses5hex']
-    return np.array([decode_pulse(p) for p in Pulses])
+    # Decode the pulse fields.
+    rows = [
+        [int(x, base=16) for x in row.split(',')]
+        for row in data.arrays['#Pulses5hex']
+    ]
+    rows = np.array(rows, dtype=np.int64)
+
+    # Store the pulses as a table.
+    pulses = np.zeros(len(rows), dtype=PULSE_DTYPE)
+    pulses['MaxHeight'] = rows[:, 0]
+    pulses['MidHeight'] = rows[:, 1]
+    pulses['Width'] = rows[:, 2]
+    pulses['Area'] = rows[:, 3]
+    pulses['Gain'] = rows[:, 4]
+
+    return pulses
 
 def extract_diameters(data):
     '''
@@ -93,7 +116,7 @@ def extract_diameters(data):
     Resistance = 25 * int(Instrument['Gain'])  # kohm
 
     Pulses = extract_pulses(data)
-    Height = Pulses[:, 0] + MaxHtCorr
+    Height = Pulses['MaxHeight'] + MaxHtCorr
     Diameter = Kd * (Height / (CountsPerVolt * Current * Resistance)) ** (1/3)
 
     return Diameter
