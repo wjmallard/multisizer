@@ -124,18 +124,18 @@ def extract_diameters(data):
      * D_ref = Kd, the aperture's calibration constant, in microns;
                this is the diameter whose V_pulse would equal V_ref
     '''
-    Pulses = extract_pulses(data)
-    Instrument = data.fields['instrument']
+    pulses = extract_pulses(data)
+    instrument = data.fields['instrument']
 
     # Load instrument parameters.
-    MaxHtCorr = int(Instrument['MaxHtCorr'])
-    CountsPerVolt = float(Instrument['CperV'])  # 1/V
-    Current = int(Instrument['Current']) / 1000  # mA
-    Resistance = float(Instrument['Resistance'])  # kohm
+    MaxHtCorr = float(instrument['MaxHtCorr'])
+    CountsPerVolt = float(instrument['CperV'])  # 1/V
+    Current = float(instrument['Current']) / 1000  # uA -> mA
+    Resistance = float(instrument['Resistance'])  # kohm
 
     # Calculate power law terms.
-    D_ref = float(Instrument['Kd'])  # microns
-    V_pulse = (Pulses['MaxHeight'] + MaxHtCorr) / CountsPerVolt  # V
+    D_ref = float(instrument['Kd'])  # microns
+    V_pulse = (pulses['MaxHeight'] + MaxHtCorr) / CountsPerVolt  # V
     V_ref = Current * Resistance  # mA * kohm = V
 
     # Calculate ESD.
