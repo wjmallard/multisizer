@@ -145,12 +145,15 @@ def extract_diameters(data):
 
 def extract_volumes(data):
     '''
-    Extract volumes from pulses in an m3 file.
+    Convert pulse heights to equivalent spherical volumes, in femtoliters.
 
-    Volumes are reported in cubic microns, aka femtoliters.
+        V = (pi / 6) * D ** 3
+
+    where D is the ESD from extract_diameters, in microns.
+    A cubic micron is a femtoliter.
     '''
     Diameter = extract_diameters(data)
-    Volume = np.pi / 6 * Diameter ** 3
+    Volume = (np.pi / 6) * Diameter ** 3
 
     return Volume
 
