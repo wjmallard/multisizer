@@ -114,24 +114,32 @@ def extract_pulses(data):
 
 def extract_diameters(data):
     '''
-    Extract diameters from pulses in an m3 file.
+    Convert pulse heights to equivalent spherical diameters (ESD), in microns.
 
-    These correspond to the spherical equivalent diameter,
-    aka the Heywood diameter.
+        D = D_ref * (V_pulse / V_ref) ** (1/3)
 
-    Diameters are reported in microns.
+    where:
+     * V_pulse = (MaxHeight + MaxHtCorr) / CperV, the pulse height in volts
+     * V_ref = I * R, aperture current times gain resistance, in volts
+     * D_ref = Kd, the aperture's calibration constant, in microns;
+               this is the diameter whose V_pulse would equal V_ref
     '''
+    Pulses = extract_pulses(data)
     Instrument = data.fields['instrument']
 
-    Kd = float(Instrument['Kd'])
+    # Load instrument parameters.
     MaxHtCorr = int(Instrument['MaxHtCorr'])
     CountsPerVolt = float(Instrument['CperV'])  # 1/V
     Current = int(Instrument['Current']) / 1000  # mA
     Resistance = float(Instrument['Resistance'])  # kohm
 
-    Pulses = extract_pulses(data)
-    Height = Pulses['MaxHeight'] + MaxHtCorr
-    Diameter = Kd * (Height / (CountsPerVolt * Current * Resistance)) ** (1/3)
+    # Calculate power law terms.
+    D_ref = float(Instrument['Kd'])  # microns
+    V_pulse = (Pulses['MaxHeight'] + MaxHtCorr) / CountsPerVolt  # V
+    V_ref = Current * Resistance  # mA * kohm = V
+
+    # Calculate ESD.
+    Diameter = D_ref * (V_pulse / V_ref) ** (1 / 3)
 
     return Diameter
 
