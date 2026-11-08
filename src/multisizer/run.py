@@ -1,6 +1,5 @@
 import numpy as np
 
-from dataclasses import dataclass, field
 from pathlib import Path
 
 # Pulse table format:
@@ -15,7 +14,6 @@ PULSE_DTYPE = np.dtype([
     ('Flagged', np.bool_),
 ])
 
-@dataclass
 class MultisizerRun:
     '''
     A Beckman Coulter Multisizer run.
@@ -26,148 +24,148 @@ class MultisizerRun:
 
     Run files are .ini-like, with key-value pairs grouped into sections.
     '''
-    path: Path
-    fields: dict[str, dict[str, str]] = field(default_factory=dict)
-    arrays: dict[str, list[str]] = field(default_factory=dict)
 
-def parse_file(path: str | Path) -> MultisizerRun:
-    '''
-    Parse Multisizer data into 'fields' and 'arrays'.
-    '''
-    data = MultisizerRun(Path(path))
-    section = None
+    def __init__(self, path: str | Path):
+        self.path = Path(path)
+        self.fields: dict[str, dict[str, str]] = {}
+        self.arrays: dict[str, list[str]] = {}
+        self._parse()
 
-    with data.path.open(encoding='cp1252') as fh:
-        lines = [raw.strip() for raw in fh]
+    def _parse(self):
+        '''
+        Parse Multisizer data into 'fields' and 'arrays'.
+        '''
+        section = None
 
-    for line in lines:
+        with self.path.open(encoding='cp1252') as fh:
+            lines = [raw.strip() for raw in fh]
 
-        # Skip blank lines.
-        if not line:
-            continue
+        for line in lines:
 
-        # Start a new section.
-        if line.startswith('[') and line.endswith(']'):
-            section = line[1:-1].strip()
-            continue
+            # Skip blank lines.
+            if not line:
+                continue
 
-        if section is None:
-            raise ValueError(f'Found data outside of a section: {line!r}')
+            # Start a new section.
+            if line.startswith('[') and line.endswith(']'):
+                section = line[1:-1].strip()
+                continue
 
-        # Parse kv pairs.
-        key, sep, value = line.partition('=')
-        if sep:
-            data.fields.setdefault(section, {})[key.strip()] = value.strip()
-        else:
-            data.arrays.setdefault(section, []).append(line)
+            if section is None:
+                raise ValueError(f'Found data outside of a section: {line!r}')
 
-    return data
+            # Parse kv pairs.
+            key, sep, value = line.partition('=')
+            if sep:
+                self.fields.setdefault(section, {})[key.strip()] = value.strip()
+            else:
+                self.arrays.setdefault(section, []).append(line)
 
-def has_pulses(data: MultisizerRun) -> bool:
-    '''
-    Check if the file holds raw pulse data.
-    '''
-    return '#Pulses5hex' in data.arrays
+    def has_pulses(self) -> bool:
+        '''
+        Check if the file holds raw pulse data.
+        '''
+        return '#Pulses5hex' in self.arrays
 
-def extract_pulses(data: MultisizerRun) -> np.ndarray:
-    '''
-    Extract raw pulse data as a structured array (PULSE_DTYPE),
-    with columns accessed by name, e.g. pulses['MaxHeight'].
+    def extract_pulses(self) -> np.ndarray:
+        '''
+        Extract raw pulse data as a structured array (PULSE_DTYPE),
+        with columns accessed by name, e.g. pulses['MaxHeight'].
 
-    Pulse5hex fields:
-     - MaxHeight
-     - MidHeight
-     - Width
-     - Area
-     - Gain
+        Pulse5hex fields:
+         - MaxHeight
+         - MidHeight
+         - Width
+         - Area
+         - Gain
 
-    Gain bit fields:
-     - MaxGainStage
-     - MidGainStage
-     - Flagged
-    '''
-    if not has_pulses(data):
-        raise ValueError('No raw pulse data found.')
+        Gain bit fields:
+         - MaxGainStage
+         - MidGainStage
+         - Flagged
+        '''
+        if not self.has_pulses():
+            raise ValueError('No raw pulse data found.')
 
-    # Decode the pulse fields.
-    rows = [
-        [int(x, base=16) for x in row.split(',')]
-        for row in data.arrays['#Pulses5hex']
-    ]
-    rows = np.array(rows, dtype=np.int64)
+        # Decode the pulse fields.
+        rows = [
+            [int(x, base=16) for x in row.split(',')]
+            for row in self.arrays['#Pulses5hex']
+        ]
+        rows = np.array(rows, dtype=np.int64)
 
-    # Store the pulses as a table.
-    pulses = np.zeros(len(rows), dtype=PULSE_DTYPE)
-    pulses['MaxHeight'] = rows[:, 0]
-    pulses['MidHeight'] = rows[:, 1]
-    pulses['Width'] = rows[:, 2]
-    pulses['Area'] = rows[:, 3]
-    pulses['Gain'] = rows[:, 4]
+        # Store the pulses as a table.
+        pulses = np.zeros(len(rows), dtype=PULSE_DTYPE)
+        pulses['MaxHeight'] = rows[:, 0]
+        pulses['MidHeight'] = rows[:, 1]
+        pulses['Width'] = rows[:, 2]
+        pulses['Area'] = rows[:, 3]
+        pulses['Gain'] = rows[:, 4]
 
-    # Unpack the Gain bit field.
-    gain = pulses['Gain']
-    pulses['MaxGainStage'] = gain & 0x0F
-    pulses['MidGainStage'] = (gain & 0x70) >> 4
-    pulses['Flagged'] = (gain & 0x80) != 0
+        # Unpack the Gain bit field.
+        gain = pulses['Gain']
+        pulses['MaxGainStage'] = gain & 0x0F
+        pulses['MidGainStage'] = (gain & 0x70) >> 4
+        pulses['Flagged'] = (gain & 0x80) != 0
 
-    return pulses
+        return pulses
 
-def extract_diameters(data: MultisizerRun) -> np.ndarray:
-    '''
-    Convert pulse heights to equivalent spherical diameters (ESD), in microns.
+    def extract_diameters(self) -> np.ndarray:
+        '''
+        Convert pulse heights to equivalent spherical diameters (ESD), in microns.
 
-        D = D_ref * (V_pulse / V_ref) ** (1/3)
+            D = D_ref * (V_pulse / V_ref) ** (1/3)
 
-    where:
-     * V_pulse = (MaxHeight + MaxHtCorr) / CperV, the pulse height in volts
-     * V_ref = I * R, aperture current times gain resistance, in volts
-     * D_ref = Kd, the aperture's calibration constant, in microns;
-               this is the diameter whose V_pulse would equal V_ref
-    '''
-    pulses = extract_pulses(data)
-    instrument = data.fields['instrument']
+        where:
+         * V_pulse = (MaxHeight + MaxHtCorr) / CperV, the pulse height in volts
+         * V_ref = I * R, aperture current times gain resistance, in volts
+         * D_ref = Kd, the aperture's calibration constant, in microns;
+                   this is the diameter whose V_pulse would equal V_ref
+        '''
+        pulses = self.extract_pulses()
+        instrument = self.fields['instrument']
 
-    # Load instrument parameters.
-    MaxHtCorr = float(instrument['MaxHtCorr'])
-    CountsPerVolt = float(instrument['CperV'])  # 1/V
-    Current = float(instrument['Current']) / 1000  # uA -> mA
-    Resistance = float(instrument['Resistance'])  # kohm
+        # Load instrument parameters.
+        MaxHtCorr = float(instrument['MaxHtCorr'])
+        CountsPerVolt = float(instrument['CperV'])  # 1/V
+        Current = float(instrument['Current']) / 1000  # uA -> mA
+        Resistance = float(instrument['Resistance'])  # kohm
 
-    # Calculate power law terms.
-    D_ref = float(instrument['Kd'])  # microns
-    V_pulse = (pulses['MaxHeight'] + MaxHtCorr) / CountsPerVolt  # V
-    V_ref = Current * Resistance  # mA * kohm = V
+        # Calculate power law terms.
+        D_ref = float(instrument['Kd'])  # microns
+        V_pulse = (pulses['MaxHeight'] + MaxHtCorr) / CountsPerVolt  # V
+        V_ref = Current * Resistance  # mA * kohm = V
 
-    # Calculate ESD.
-    Diameter = D_ref * (V_pulse / V_ref) ** (1 / 3)
+        # Calculate ESD.
+        Diameter = D_ref * (V_pulse / V_ref) ** (1 / 3)
 
-    return Diameter
+        return Diameter
 
-def extract_volumes(data: MultisizerRun) -> np.ndarray:
-    '''
-    Convert pulse heights to equivalent spherical volumes, in femtoliters.
+    def extract_volumes(self) -> np.ndarray:
+        '''
+        Convert pulse heights to equivalent spherical volumes, in femtoliters.
 
-        V = (pi / 6) * D ** 3
+            V = (pi / 6) * D ** 3
 
-    where D is the ESD from extract_diameters, in microns.
-    A cubic micron is a femtoliter.
-    '''
-    Diameter = extract_diameters(data)
-    Volume = (np.pi / 6) * Diameter ** 3
+        where D is the ESD from extract_diameters, in microns.
+        A cubic micron is a femtoliter.
+        '''
+        Diameter = self.extract_diameters()
+        Volume = (np.pi / 6) * Diameter ** 3
 
-    return Volume
+        return Volume
 
-def extract_histogram(data: MultisizerRun) -> tuple[np.ndarray, np.ndarray]:
-    '''
-    Extract histogram data generated by the Multisizer control software.
+    def extract_histogram(self) -> tuple[np.ndarray, np.ndarray]:
+        '''
+        Extract histogram data generated by the Multisizer control software.
 
-    Returns (bin_edges, bin_counts), each with nBins + 1 entries: the
-    edges bound nBins bins, and the trailing count is unused (zero in
-    every file seen).
+        Returns (bin_edges, bin_counts), each with nBins + 1 entries: the
+        edges bound nBins bins, and the trailing count is unused (zero in
+        every file seen).
 
-    M3 bins are geometric in diameter; Z2 bins are linear in volume.
-    '''
-    bin_edges = np.array(data.arrays['#Bindiam'], dtype=float)
-    bin_counts = np.array(data.arrays['#Binheight'], dtype=float)
+        M3 bins are geometric in diameter; Z2 bins are linear in volume.
+        '''
+        bin_edges = np.array(self.arrays['#Bindiam'], dtype=float)
+        bin_counts = np.array(self.arrays['#Binheight'], dtype=float)
 
-    return bin_edges, bin_counts
+        return bin_edges, bin_counts
