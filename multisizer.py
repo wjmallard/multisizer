@@ -1,5 +1,4 @@
 import numpy as np
-import re
 
 def parse_M3_file(filename):
     '''
@@ -7,27 +6,26 @@ def parse_M3_file(filename):
     '''
     data = {}
     section = None
-    
-    p_section = re.compile('^\[(.*)\]')
-    p_field = re.compile('^(.*)=(.*)')
-    
-    with open(filename) as fid:
-        for line in fid:
 
-            m_section = p_section.match(line)
-            m_field = p_field.match(line)
+    with open(filename) as fh:
+        lines = [raw.strip() for raw in fh]
 
-            if m_section:
-                section = m_section.groups()[0]
-                data[section] = {}
-                continue
-            elif m_field:
-                k, v = m_field.groups()
-                data[section][k] = v.strip()
-            else:
-                if 'Values' not in data[section]:
-                    data[section]['Values'] = []
-                data[section]['Values'].append(line.strip())
+    for line in lines:
+
+        # Start a new section.
+        if line.startswith('[') and line.endswith(']'):
+            section = line[1:-1].strip()
+            data[section] = {}
+            continue
+
+        # Parse kv pairs.
+        key, sep, value = line.partition('=')
+        if sep:
+            data[section][key.strip()] = value.strip()
+        else:
+            if 'Values' not in data[section]:
+                data[section]['Values'] = []
+            data[section]['Values'].append(line)
 
     return data
 
