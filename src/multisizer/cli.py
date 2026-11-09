@@ -17,7 +17,8 @@ multisizer: tables from Beckman Coulter run files (.#M3, .=#Z2)
                             FILE.pulses.csv when the file has pulses (M3)
   multisizer                Show this overview
 
-Commands take --help for options.
+Commands take --help for options. Install and usage notes are in
+README.md.
 '''
 
 

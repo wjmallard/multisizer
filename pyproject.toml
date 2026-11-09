@@ -2,6 +2,7 @@
 name = "multisizer"
 version = "0.1.0"
 description = "Parse Beckman Coulter Multisizer 3 (.#M3) and Z2 AccuComp (.=#Z2) data files"
+readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
