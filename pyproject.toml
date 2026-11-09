@@ -17,6 +17,9 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 
+[project.scripts]
+multisizer = "multisizer.cli:main"
+
 [project.urls]
 Repository = "https://github.com/wjmallard/multisizer"
 
